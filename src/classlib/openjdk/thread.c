@@ -190,6 +190,12 @@ int classlibInitialiseSignals() {
     act.sa_flags = SA_RESTART;
     sigaction(SIGQUIT, &act, NULL);
 
+    /* make sure SIGINT and SIGQUIT are unblocked */
+    sigset_t sigset;
+    sigemptyset (&sigset);
+    sigaddset(&sigset, SIGQUIT);
+    sigaddset(&sigset, SIGINT);
+    sigprocmask(SIG_UNBLOCK, &sigset, NULL);
 
 #ifdef __APPLE__
     char *sem_name = tmpnam(NULL);

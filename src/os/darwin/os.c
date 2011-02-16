@@ -50,7 +50,7 @@ char *nativeLibError() {
 }
 
 char *nativeLibPath() {
-    return getenv("LD_LIBRARY_PATH");
+    return getenv("DYLD_LIBRARY_PATH");
 }
 
 /* GNU Classpath's libraries end in .dylib because it
@@ -59,7 +59,10 @@ char *nativeLibPath() {
 
    On Mac OS X/Intel libtool seems to use a .so ending.
    This is wrong, but a workaround for now is to _also_
-   try .so! 
+   try .so!
+
+   OpenJDK seems to already apppend .dylib to the path name
+   so we also try without prefix
 */
 
 void *nativeLibOpen(char *path) {
@@ -68,17 +71,21 @@ void *nativeLibOpen(char *path) {
     char buff[len + sizeof(".jnilib") + 1];
      
     strcpy(buff, path);
-    strcpy(buff + len, ".dylib");
-
+    /* first try with no extra extension */
     if((handle = dlopen(buff, RTLD_LAZY)) == NULL) {
-        strcpy(buff + len, ".jnilib");
-
-        if((handle = dlopen(buff, RTLD_LAZY)) == NULL) {
-            strcpy(buff + len, ".so");
-
-            handle = dlopen(buff, RTLD_LAZY);
-        }
+		strcpy(buff + len, ".dylib");
+	
+		if((handle = dlopen(buff, RTLD_LAZY)) == NULL) {
+			strcpy(buff + len, ".jnilib");
+	
+			if((handle = dlopen(buff, RTLD_LAZY)) == NULL) {
+				strcpy(buff + len, ".so");
+	
+				handle = dlopen(buff, RTLD_LAZY);
+			}
+		}
     }
+    
     return handle;
 }
 
@@ -95,4 +102,19 @@ char *nativeLibMapName(char *name) {
 
    sprintf(buff, "lib%s", name);
    return buff;
+}
+
+char *nativeJVMPath() {
+    Dl_info info;
+    char *path;
+
+    if(dladdr(nativeJVMPath, &info) == 0) {
+        printf("Error: dladdr failed.  Aborting VM\n");
+        exitVM(1);
+    }
+
+    path = sysMalloc(strlen(info.dli_fname) + 1);
+    strcpy(path, info.dli_fname);
+
+    return path;
 }

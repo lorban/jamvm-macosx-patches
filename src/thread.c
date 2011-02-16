@@ -1382,8 +1382,8 @@ void initialiseThreadStage2(InitArgs *args) {
     return;
 
 error:
-    jam_fprintf(stderr, "Error initialising VM (initialiseMainThread)\nCheck "
-                        "the README for compatible versions of GNU Classpath\n");
+    jam_fprintf(stderr, "Error initialising VM (initialiseMainThread)\n"
+                        "Check the README for compatible versions of GNU Classpath or OpenJDK\n");
     printException();
     exitVM(1);
 }

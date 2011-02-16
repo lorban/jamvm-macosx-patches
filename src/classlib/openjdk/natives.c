@@ -34,17 +34,24 @@
 #include "natives.h"
 #include "openjdk.h"
 
+#ifdef __APPLE__
+#  define LIB_JAVA_NAME "/libjava"
+#else
+#  define LIB_JAVA_NAME "/libjava.so"
+#endif
+
+
 int classlibInitialiseNatives() {
     Class *field_accessor;
     FieldBlock *base_fb = NULL;
     char *dll_path = getBootDllPath();
-    char path[strlen(dll_path) + sizeof("/libjava.so")];
+    char path[strlen(dll_path) + sizeof(LIB_JAVA_NAME)];
 
-    strcat(strcpy(path, dll_path), "/libjava.so");
+    strcat(strcpy(path, dll_path), LIB_JAVA_NAME);
 
     if(!resolveDll(path, NULL)) {
-        printf("Error initialising natives: couldn't open libjava.so: "
-               "use -verbose:jni for more information\n");
+        printf("Error initialising natives: couldn't open %s: "
+               "use -verbose:jni for more information\n", path);
         return FALSE;
     }
 

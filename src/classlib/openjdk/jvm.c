@@ -26,6 +26,7 @@
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
+#include <sys/termios.h>
 
 #include <signal.h>
 #include <unistd.h>
@@ -57,6 +58,14 @@ static int have_monotonic_clock;
 #else
 #define have_monotonic_clock FALSE
 #endif
+
+/* On Darwin file I/O is 64-bit by default (10.5 at least) */
+#ifdef __APPLE__
+#  define off64_t off_t
+#  define lseek64 lseek
+#  define ftruncate64 ftruncate
+#endif
+
 
 static Class *cloneable_class, *constant_pool_class;
 static Class *exception_class, *runtime_excp_class;
@@ -167,17 +176,17 @@ jlong JVM_CurrentTimeMillis(JNIEnv *env, jclass ignored) {
 jlong JVM_NanoTime(JNIEnv *env, jclass ignored) {
     TRACE("JVM_NanoTime(env=%p, ignored=%p)", env, ignored);
 
-    if(have_monotonic_clock) {
+#if defined(HAVE_LIBRT) && defined(CLOCK_MONOTONIC)
         struct timespec ts;
 
         clock_gettime(CLOCK_MONOTONIC, &ts);
         return (jlong) ts.tv_sec * 1000000000 + ts.tv_nsec;
-    } else {
+#else
         struct timeval tv;
 
         gettimeofday(&tv, NULL);
         return (jlong) tv.tv_sec * 1000000000 + tv.tv_usec * 1000;
-    }
+#endif
 }
 
 
@@ -1508,6 +1517,7 @@ jint JVM_Available(jint fd, jlong *bytes) {
         case S_IFCHR:
         case S_IFIFO:
         case S_IFSOCK: {
+#ifndef __APPLE__
             int n;
 
             if(ioctl(fd, TIOCINQ, &n) == -1)
@@ -1515,6 +1525,9 @@ jint JVM_Available(jint fd, jlong *bytes) {
 
             *bytes = n;
             return 1;
+#else
+    		return 0;
+#endif
         }
 
         default: {
@@ -2107,8 +2120,10 @@ jint JVM_SendTo(jint fd, char *buf, int len, int flags, struct sockaddr *to,
 jint JVM_SocketAvailable(jint fd, jint *pbytes) {
     TRACE("JVM_SocketAvailable(fd=%d, pbytes=%p)", fd, pbytes);
 
+#ifndef __APPLE__
     if(ioctl(fd, TIOCINQ, pbytes) == -1)
         return JNI_FALSE;
+#endif
 
     return JNI_TRUE;
 }

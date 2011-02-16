@@ -52,8 +52,10 @@ char *getCommandLineProperty(char *key) {
 void setJavaHome() {
     java_home = getCommandLineProperty("java.home");
 
+#ifndef __APPLE__
     if(java_home == NULL)
         java_home = getenv("JAVA_HOME");
+#endif
 
     if(java_home == NULL)
         java_home = classlibDefaultJavaHome();

@@ -193,7 +193,6 @@ int classlibInitialiseSignals() {
 
 #ifdef __APPLE__
     char *sem_name = tmpnam(NULL);
-    jam_fprintf(stderr, "creating semaphore [%s]\n", sem_name);
     signal_sem = sem_open(sem_name, O_CREAT, 0666, 0);
 #else
     sem_init(&signal_sem, 0, 0);

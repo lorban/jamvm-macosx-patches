@@ -134,13 +134,21 @@ void classlibThreadName2Buff(Object *jThread, char *buffer, int buff_len) {
     buffer[len] = '\0';
 }
 
+#ifdef __APPLE__
+static sem_t *signal_sem;
+#else
 static sem_t signal_sem;
+#endif
 static MethodBlock *signal_dispatch_mb;
 static sig_atomic_t pending_signals[NSIG];
 
 void signalHandler(int sig) {
     pending_signals[sig] = TRUE;
+#ifdef __APPLE__
+    sem_post(signal_sem);
+#else
     sem_post(&signal_sem);
+#endif
 }
 
 void classlibSignalThread(Thread *self) {
@@ -149,7 +157,11 @@ void classlibSignalThread(Thread *self) {
     disableSuspend0(self, &self);
     for(;;) {
         do {
+#ifdef __APPLE__
+            int rc = sem_wait(signal_sem);
+#else
             sem_wait(&signal_sem);
+#endif
 
             for(sig = 0; sig < NSIG && !pending_signals[sig]; sig++);
         } while(sig == NSIG);
@@ -178,7 +190,14 @@ int classlibInitialiseSignals() {
     act.sa_flags = SA_RESTART;
     sigaction(SIGQUIT, &act, NULL);
 
+
+#ifdef __APPLE__
+    char *sem_name = tmpnam(NULL);
+    jam_fprintf(stderr, "creating semaphore [%s]\n", sem_name);
+    signal_sem = sem_open(sem_name, O_CREAT, 0666, 0);
+#else
     sem_init(&signal_sem, 0, 0);
+#endif
 
     signal_class = findSystemClass(SYMBOL(sun_misc_Signal));
     if(signal_class == NULL)

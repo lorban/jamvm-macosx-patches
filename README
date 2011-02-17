@@ -4,7 +4,7 @@
 This is a fork of the unreleased yet official JamVM/OpenJDK sources available at git://git.berlios.de/jamvm . The only
 goal of this version is to improve the MacOSX support for the OpenJDK classlib without bothering the author too much.
 
-I may have broken other OS support or GNU classpath support but that's not of important ATM as my only intent is to
+I may have broken other OS support or GNU classpath support but that's not important ATM as my only intent is to
 figure out what's missing and what's broken in the JamVM/OpenJDK/MacOSX trio to make it work as well as Hotspot then
 persuade Rob Lougher to make the necessary changes in the official version.
 
@@ -31,7 +31,7 @@ cp <JAMVM_BUILD_DIR>/src/.libs/libjvm.dylib OpenJDK6-b16-jamvm/jre/lib/i386/serv
 
 You can then run it by running the normal java wrapper, e.g.:
 
-/usr/lib/jvm/jamvm-openjdk/jre/bin/java -version
+/Applications/OSCG/OpenJDK6-b16-jamvm/bin/java -version
 
 openjdk version "1.6.0-internal"
 OpenJDK Runtime Environment (build 1.6.0-internal-landonf_17_may_2009_13_58-b00)

@@ -37,6 +37,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <netdb.h>
+#include <poll.h>
 
 #include "jam.h"
 #include "jni.h"
@@ -1517,7 +1518,15 @@ jint JVM_Available(jint fd, jlong *bytes) {
         case S_IFCHR:
         case S_IFIFO:
         case S_IFSOCK: {
-#ifndef __APPLE__
+#ifdef __APPLE__
+            int n;
+
+            if(ioctl(fd, FIONREAD, &n) == -1)
+                return 0;
+
+            *bytes = n;
+            return 1;
+#else
             int n;
 
             if(ioctl(fd, TIOCINQ, &n) == -1)
@@ -1525,8 +1534,6 @@ jint JVM_Available(jint fd, jlong *bytes) {
 
             *bytes = n;
             return 1;
-#else
-    		return 0;
 #endif
         }
 
@@ -2044,9 +2051,41 @@ jint JVM_Send(jint fd, char *buf, jint nBytes, jint flags) {
 /* JVM_Timeout */
 
 jint JVM_Timeout(int fd, long timeout) {
-    UNIMPLEMENTED("JVM_Timeout");
+#ifdef __APPLE__
+  /* Note: the following code has been copied and adapted from HotSpot's OpenJDK7 BSD port */
+  time_t prevtime,newtime;
+  struct timeval t;
 
+  gettimeofday(&t, NULL);
+  prevtime = ((time_t)t.tv_sec * 1000)  +  t.tv_usec / 1000;
+
+  for(;;) {
+    struct pollfd pfd;
+
+    pfd.fd = fd;
+    pfd.events = POLLIN | POLLERR;
+
+    int res = poll(&pfd, 1, timeout);
+
+    if (res < 0 && errno == EINTR) {
+
+      // On Bsd any value < 0 means "forever"
+
+      if(timeout >= 0) {
+        gettimeofday(&t, NULL);
+        newtime = ((time_t)t.tv_sec * 1000)  +  t.tv_usec / 1000;
+        timeout -= newtime - prevtime;
+        if(timeout <= 0)
+          return 0;
+        prevtime = newtime;
+      }
+    } else
+      return res;
+  }
+#else
+    UNIMPLEMENTED("JVM_Timeout");
     return 0;
+#endif
 }
 
 
@@ -2120,7 +2159,10 @@ jint JVM_SendTo(jint fd, char *buf, int len, int flags, struct sockaddr *to,
 jint JVM_SocketAvailable(jint fd, jint *pbytes) {
     TRACE("JVM_SocketAvailable(fd=%d, pbytes=%p)", fd, pbytes);
 
-#ifndef __APPLE__
+#ifdef __APPLE__
+    if(ioctl(fd, FIONREAD, pbytes) == -1)
+        return JNI_FALSE;
+#else
     if(ioctl(fd, TIOCINQ, pbytes) == -1)
         return JNI_FALSE;
 #endif

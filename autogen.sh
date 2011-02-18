@@ -7,7 +7,7 @@ srcdir=`dirname $0`
 test -z "$srcdir" && srcdir=.
 
 export CFLAGS="-m32 -g -O2"
-alias libtoolize glibtoolize
+alias libtoolize=glibtoolize
 
 (libtoolize --version) < /dev/null > /dev/null 2>&1 || {
   echo

@@ -16,9 +16,9 @@ Quick instructions
 ~~~~~~~
 After cloning the git repository, do:
 
-./autogen.sh --with-java-runtime-library=openjdk
+CFLAGS=-m32 ./autogen.sh --with-java-runtime-library=openjdk
 
-This will generate the autoconf/automake files and configure JamVM to build support for OpenJDK.
+This will generate the autoconf/automake files and configure JamVM to build support for 32-bit OpenJDK.
 
 Then do make as usual. This will put libjvm.dylib into ./src/.libs/ .
 
@@ -38,9 +38,8 @@ OpenJDK Runtime Environment (build 1.6.0-internal-landonf_17_may_2009_13_58-b00)
 JamVM (build 1.6.0-devel, inline-threaded interpreter with stack-caching)
 
 (the inline-threaded interpreter is the other name for the code-copying JIT)
-~~~~~~~
 
-There are two pre-built versions of 32-bit OpenJDK6 which do work fine (JamVM does not support 64-bit on MacOSX):
+There are two pre-built versions of 32-bit OpenJDK6 which do work fine:
 
   * OpenSCG OpenJDK 6 One-click Installers: http://www.openscg.com/se/openjdk/index.jsp
 
@@ -51,3 +50,16 @@ There are two pre-built versions of 32-bit OpenJDK6 which do work fine (JamVM do
   * SoyLatte: http://landonf.bikemonkey.org/static/soylatte/
 
        This build is older than the OpenSCG one but Swing works with it.
+
+~~~~~~~
+For a 64-bit build, after cloning the git repository, do:
+
+CFLAGS=-m64 ./autogen.sh --with-java-runtime-library=openjdk
+
+There is no pre-built version of 64-bit OpenJDK6 but the one maintained by macports (http://www.macports.org)
+works fine.
+
+After building it, just do the same as for the 32-bit build, ie: replace the libjvm.dylib bundled with OpenJDK6
+with the JamVM one:
+
+cp <JAMVM_BUILD_DIR>/src/.libs/libjvm.dylib <OpenJDK6-HOME>/jre/lib/amd64/server

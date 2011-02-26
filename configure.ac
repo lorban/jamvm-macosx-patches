@@ -32,7 +32,20 @@ AC_CANONICAL_HOST
 case "$host" in
 i[[3456]]86-*-linux*) host_cpu=i386 host_os=linux ;;
 i[[3456]]86-*-kfreebsd*) host_cpu=i386 host_os=linux ;;
-i[[3456]]86-*-darwin*) host_cpu=x86_64 host_os=darwin ;;
+i[[3456]]86-*-darwin*)
+  host_os=darwin
+  case "$CFLAGS" in
+    *-m32*) host_cpu=i386 ;;
+    *-m64*) host_cpu=x86_64 ;;
+    *)
+      case "$host" in
+        *10.[[012345]].*) host_cpu=i386 ;;
+        *)  host_cpu=x86_64 ;;
+      esac
+    ;;
+  esac
+  echo "$host: target CPU set to ${host_cpu}"
+;;
 arm*-*-darwin*) host_cpu=arm host_os=darwin libdl_needed=no ;;
 i386-*-openbsd*) host_os=bsd libdl_needed=no ;;
 i386-*-freebsd*) host_os=bsd libdl_needed=no ;;

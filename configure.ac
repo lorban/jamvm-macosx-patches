@@ -45,6 +45,10 @@ i[[3456]]86-*-darwin*)
     ;;
   esac
   echo "$host: target CPU set to ${host_cpu}"
+  if test "$host_cpu" = "x86_64"; then
+    enable_ffi=yes
+    CFLAGS="$CFLAGS -I/usr/include/ffi"
+  fi
 ;;
 arm*-*-darwin*) host_cpu=arm host_os=darwin libdl_needed=no ;;
 i386-*-openbsd*) host_os=bsd libdl_needed=no ;;

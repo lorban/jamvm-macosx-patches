@@ -20,7 +20,7 @@
 ##
 
 noinst_LTLIBRARIES = libnative.la
-libnative_la_SOURCES = init.c dll_md.c callNative.S jni-stubs.c stubs_md.c
+libnative_la_SOURCES = init.c jni-stubs.c stubs_md.c
 
 AM_CPPFLAGS = -I$(top_builddir)/src
 AM_CCASFLAGS = -I$(top_builddir)/src

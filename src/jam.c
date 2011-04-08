@@ -61,10 +61,12 @@ void showNonStandardOptions() {
     printf("\t\t   <value> copy when usage reaches threshold value\n");
     printf("  -Xcodemem:[unlimited|<size>] (default maximum heapsize/4)\n");
 #endif
-    printf("  -Xms<size>\t   set the initial size of the heap "
-           "(default = %dM)\n", DEFAULT_MIN_HEAP/MB);
-    printf("  -Xmx<size>\t   set the maximum size of the heap "
-           "(default = %dM)\n", DEFAULT_MAX_HEAP/MB);
+    printf("  -Xms<size>\t   set the initial size of the heap\n");
+    printf("\t\t   (default = MAX(physical memory/64, %dM))\n",
+           DEFAULT_MIN_HEAP/MB);
+    printf("  -Xmx<size>\t   set the maximum size of the heap\n");
+    printf("\t\t   (default = MIN(physical memory/4, %dM))\n",
+           DEFAULT_MAX_HEAP/MB);
     printf("  -Xss<size>\t   set the Java stack size for each thread "
            "(default = %dK)\n", DEFAULT_STACK/KB);
     printf("\t\t   size may be followed by K,k or M,m (e.g. 2M)\n");
@@ -318,7 +320,8 @@ int parseCommandLine(int argc, char *argv[], InitArgs *args) {
         } else if(strcmp(argv[i], "-client") == 0 ||
                   strcmp(argv[i], "-server") == 0 ||
                   strncmp(argv[i], "-XX:PermSize=", 13) == 0 ||
-                  strncmp(argv[i], "-XX:MaxPermSize=", 16) == 0) {
+                  strncmp(argv[i], "-XX:MaxPermSize=", 16) == 0 ||
+                  strncmp(argv[i], "-XX:ThreadStackSize=", 20) == 0) {
             /* Ignore */
         } else {
             printf("Unrecognised command line option: %s\n", argv[i]);

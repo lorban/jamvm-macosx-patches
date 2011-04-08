@@ -67,23 +67,23 @@ char *nativeLibPath() {
 
 void *nativeLibOpen(char *path) {
     void *handle;
-    int len = strlen(path);
-    char buff[len + sizeof(".jnilib") + 1];
+
+    if((handle = dlopen(path, RTLD_LAZY)) == NULL) {
+        int len = strlen(path);
+        char buff[len + sizeof(".jnilib") + 1];
      
-    strcpy(buff, path);
-    /* first try with no extra extension */
-    if((handle = dlopen(buff, RTLD_LAZY)) == NULL) {
-		strcpy(buff + len, ".dylib");
-	
-		if((handle = dlopen(buff, RTLD_LAZY)) == NULL) {
-			strcpy(buff + len, ".jnilib");
-	
-			if((handle = dlopen(buff, RTLD_LAZY)) == NULL) {
-				strcpy(buff + len, ".so");
-	
-				handle = dlopen(buff, RTLD_LAZY);
-			}
-		}
+        strcpy(buff, path);
+        strcpy(buff + len, ".dylib");
+
+        if((handle = dlopen(buff, RTLD_LAZY)) == NULL) {
+            strcpy(buff + len, ".jnilib");
+
+            if((handle = dlopen(buff, RTLD_LAZY)) == NULL) {
+                strcpy(buff + len, ".so");
+
+                handle = dlopen(buff, RTLD_LAZY);
+            }
+        }
     }
     
     return handle;
@@ -118,3 +118,7 @@ char *nativeJVMPath() {
 
     return path;
 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> a95ca049d3bb257d730535a5d5ec3f73a943d0aa

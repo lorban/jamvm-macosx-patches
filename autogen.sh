@@ -6,7 +6,7 @@ DIE=0
 srcdir=`dirname $0`
 test -z "$srcdir" && srcdir=.
 
-export CFLAGS="-g -O2 $CFLAGS"
+export CFLAGS="-g -O2 -framework CoreServices $CFLAGS"
 alias libtoolize=glibtoolize
 
 (libtoolize --version) < /dev/null > /dev/null 2>&1 || {

@@ -30,6 +30,16 @@
 
 #include "../../jam.h"
 
+long long getPhysicalMemory() {
+    /* Long longs are used here because with PAE, a 32-bit
+       machine can have more than 4GB of physical memory */
+
+    long long num_pages = sysconf(_SC_PHYS_PAGES);
+    long long page_size = sysconf(_SC_PAGESIZE);
+
+    return num_pages * page_size;
+}
+
 void *nativeStackBase() {
 #ifdef __UCLIBC__
     return NULL;

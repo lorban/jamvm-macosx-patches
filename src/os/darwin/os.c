@@ -25,6 +25,7 @@
 #include <dlfcn.h>
 #include <sys/sysctl.h>
 #include <pthread.h>
+#include <Carbon/Carbon.h>
 
 #include "../../jam.h"
 
@@ -118,7 +119,20 @@ char *nativeJVMPath() {
 
     return path;
 }
-<<<<<<< HEAD
-=======
 
->>>>>>> a95ca049d3bb257d730535a5d5ec3f73a943d0aa
+
+long long getPhysicalMemory() {
+    /* Long longs are used here because with PAE, a 32-bit
+       machine can have more than 4GB of physical memory */
+
+    // On Mac OS X, sysctl with selectors CTL_HW, HW_PHYSMEM returns only a 
+    // 4-byte value, even if passed an 8-byte buffer, and limits the returned 
+    // value to 2GB when the actual RAM size is > 2GB.  The Gestalt selector 
+    // gestaltPhysicalRAMSizeInMegabytes is available starting with OS 10.3.0.
+    long mem_size;
+    if (Gestalt(gestaltPhysicalRAMSizeInMegabytes, &mem_size)) {
+        perror("Couldn't determine physical RAM size");
+        exit(1);
+    }
+    return ((long long)(1024 * 1024)) * mem_size;
+}

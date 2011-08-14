@@ -30,16 +30,6 @@
 static int VM_initing = TRUE;
 extern void initialisePlatform();
 
-long long getPhysicalMemory() {
-    /* Long longs are used here because with PAE, a 32-bit
-       machine can have more than 4GB of physical memory */
-
-    long long num_pages = sysconf(_SC_PHYS_PAGES);
-    long long page_size = sysconf(_SC_PAGESIZE);
-
-    return num_pages * page_size;
-}
-
 unsigned long clampHeapLimit(long long limit) {
     long long int clamp = MAX(limit, DEFAULT_MIN_HEAP);
     return (unsigned long)MIN(clamp, DEFAULT_MAX_HEAP);

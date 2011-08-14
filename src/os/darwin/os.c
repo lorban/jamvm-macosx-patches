@@ -131,8 +131,8 @@ long long getPhysicalMemory() {
     // gestaltPhysicalRAMSizeInMegabytes is available starting with OS 10.3.0.
     long mem_size;
     if (Gestalt(gestaltPhysicalRAMSizeInMegabytes, &mem_size)) {
-        perror("Couldn't determine physical RAM size");
-        exit(1);
+        perror("Error: Couldn't determine physical RAM size.  Aborting VM\n");
+        exitVM(1);
     }
     return ((long long)(1024 * 1024)) * mem_size;
 }

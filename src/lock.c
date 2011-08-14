@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009
+ * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2011
  * Robert Lougher <rob@jamvm.org.uk>.
  *
  * This file is part of JamVM.
@@ -554,9 +554,11 @@ Thread *objectLockedBy(Object *obj) {
     return owner;
 }
 
-void initialiseMonitor() {
+int initialiseMonitor() {
     /* Init hash table, create lock */
     initHashTable(mon_cache, HASHTABSZE, TRUE);
+
+    return TRUE;
 }
 
 /* Heap compaction support */

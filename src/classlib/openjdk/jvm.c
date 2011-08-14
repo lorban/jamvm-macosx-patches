@@ -38,14 +38,19 @@
 #include <string.h>
 #include <netdb.h>
 #include <poll.h>
+#include <fcntl.h>
+#include <math.h>
 
 #include "jam.h"
 #include "jni.h"
 #include "lock.h"
+#include "hash.h"
+#include "class.h"
 #include "excep.h"
 #include "symbol.h"
 #include "reflect.h"
 #include "openjdk.h"
+#include "classlib.h"
 #include "properties.h"
 #include "trace.h"
 
@@ -227,7 +232,8 @@ void JVM_Exit(jint code) {
 void JVM_Halt(jint code) {
     TRACE("JVM_Halt(code=%d)", code);
 
-    shutdownVM(code);
+    shutdownVM();
+    jamvm_exit(code);
 }
 
 
@@ -489,7 +495,7 @@ jclass JVM_GetCallerClass(JNIEnv* env, int depth) {
 /* JVM_FindPrimitiveClass */
 
 jclass JVM_FindPrimitiveClass(JNIEnv* env, const char *prim_name) {
-    TRACE("JVM_FindPrimitiveClass(env=%p, s=%s)", env, prim_name);
+    TRACE("JVM_FindPrimitiveClass(env=%p, name=%s)", env, prim_name);
 
     return findPrimitiveClassByName((char*)prim_name);
 }
@@ -502,27 +508,42 @@ void JVM_ResolveClass(JNIEnv* env, jclass cls) {
 }
 
 
+/* JVM_FindClassFromBootLoader */
+
+jclass JVM_FindClassFromBootLoader(JNIEnv *env, const char *name) {
+    Class *class;
+    
+    TRACE("JVM_FindClassFromBootLoader(env=%p, name=%s)", env, name);
+  
+    class = findClassFromClassLoader((char *)name, NULL);
+
+    if(class == NULL)
+        clearException();
+
+    return class;
+}
+
+
 /* JVM_FindClassFromClassLoader */
 
 jclass JVM_FindClassFromClassLoader(JNIEnv *env, const char *name,
                                     jboolean init, jobject loader,
-                                    jboolean throwError) {
+                                    jboolean throw_error) {
     Class *class;
 
-    TRACE("JVM_FindClassFromClassLoader(name=%s, init=%d, loader=%p,"
-          " throwError=%d)", name, init, loader, throwError);
-
-    /* As of now, OpenJDK does not call this function with throwError
-       is true. */
+    TRACE("JVM_FindClassFromClassLoader(env=%p, name=%s, init=%d, loader=%p,"
+          " throwError=%d)", env, name, init, loader, throwError);
 
     class = findClassFromClassLoader((char *)name, loader);
 
-    if(class == NULL) {
+    if(class == NULL && !throw_error) {
         Object *excep = exceptionOccurred();
+        char *dot_name = slash2DotsDup((char*)name);
 
         clearException();
         signalChainedException(java_lang_ClassNotFoundException,
-                               (char *)name, excep);
+                               dot_name, excep);
+        sysFree(dot_name);
     } else
         if(init)
             initClass(class);
@@ -989,6 +1010,8 @@ jclass JVM_ConstantPoolGetClassAt(JNIEnv *env, jobject unused, jobject jcpool,
                                   jint index) {
     TBD("JVM_ConstantPoolGetClassAt(env=%p, jcpool=%p, index=%d)", env,
           jcpool, index);
+
+    return NULL;
 }
 
 
@@ -998,6 +1021,8 @@ jclass JVM_ConstantPoolGetClassAtIfLoaded(JNIEnv *env, jobject unused,
                                           jobject jcpool, jint index) {
     TBD("JVM_ConstantPoolGetClassAtIfLoaded(env=%p, unused=%p, jcpool=%p,"
           " index=%d)", env, unused, jcpool, index);
+
+    return NULL;
 }
 
 
@@ -1006,6 +1031,8 @@ jclass JVM_ConstantPoolGetClassAtIfLoaded(JNIEnv *env, jobject unused,
 jobject JVM_ConstantPoolGetMethodAt(JNIEnv *env, jobject unused,
                                     jobject jcpool, jint index) {
     TBD("JVM_ConstantPoolGetMethodAt: jcpool=%p, index=%d", jcpool, index);
+
+    return NULL;
 }
 
 
@@ -1016,6 +1043,8 @@ jobject JVM_ConstantPoolGetMethodAtIfLoaded(JNIEnv *env, jobject unused,
 
     TBD("JVM_ConstantPoolGetMethodAtIfLoaded: jcpool=%p, index=%d",
           jcpool, index);
+
+    return NULL;
 }
 
 
@@ -1024,6 +1053,8 @@ jobject JVM_ConstantPoolGetMethodAtIfLoaded(JNIEnv *env, jobject unused,
 jobject JVM_ConstantPoolGetFieldAt(JNIEnv *env, jobject unused, jobject jcpool,
                                    jint index) {
     TBD("JVM_ConstantPoolGetFieldAt: jcpool=%p, index=%d", jcpool, index);
+
+    return NULL;
 }
 
 
@@ -1034,6 +1065,8 @@ jobject JVM_ConstantPoolGetFieldAtIfLoaded(JNIEnv *env, jobject unused,
 
     TBD("JVM_ConstantPoolGetFieldAtIfLoaded: jcpool=%p, index=%d",
           jcpool, index);
+
+    return NULL;
 }
 
 
@@ -1117,6 +1150,8 @@ jdouble JVM_ConstantPoolGetDoubleAt(JNIEnv *env, jobject unused,
 jstring JVM_ConstantPoolGetStringAt(JNIEnv *env, jobject unused,
                                     jobject jcpool, jint index) {
     TBD("JVM_ConstantPoolGetStringAt: jcpool=%p, index=%d", jcpool, index);
+
+    return NULL;
 }
 
 
@@ -1617,7 +1652,7 @@ void JVM_StopThread(JNIEnv* env, jobject jthread, jobject throwable) {
 jboolean JVM_IsThreadAlive(JNIEnv* env, jobject jthread) {
     TRACE("JVM_IsThreadAlive(env=%p, jthread=%p)", env, jthread);
 
-    return jThread2Thread(jthread) != NULL;
+    return jThreadIsAlive(jthread);
 }
 
 
@@ -1849,7 +1884,7 @@ jclass JVM_LoadClass0(JNIEnv *env, jobject receiver, jclass currClass,
 /* JVM_GetArrayLength */
 
 jint JVM_GetArrayLength(JNIEnv *env, jobject arr) {
-    TRACE("JVM_GetArrayLength(arr=%p)", arr);
+    TRACE("JVM_GetArrayLength(env=%p, arr=%p)", env, arr);
 
     if(arr == NULL) {
         signalException(java_lang_NullPointerException, NULL);
@@ -1910,10 +1945,35 @@ jobject JVM_GetArrayElement(JNIEnv *env, jobject arr, jint index) {
 jvalue JVM_GetPrimitiveArrayElement(JNIEnv *env, jobject arr, jint index,
                                     jint wCode) {
     jvalue jv;
+    
+    TRACE("JVM_GetPrimitiveArrayElement(env=%p, arr=%p, index=%d, wCode=%d)",
+    	  env, arr, index, wCode);
 
-    UNIMPLEMENTED("JVM_GetPrimitiveArrayElement");
+    if(arr == NULL)
+        signalException(java_lang_NullPointerException, NULL);
+    else {
+        ClassBlock *cb = CLASS_CB(((Object*)arr)->class);
 
-    jv.l = NULL;
+        if(!IS_ARRAY(cb))
+            signalException(java_lang_IllegalArgumentException, NULL);
+        else {
+            if(index > ARRAY_LEN((Object *)arr))
+                signalException(java_lang_ArrayIndexOutOfBoundsException, NULL);
+            else {
+                ClassBlock *elem_cb = CLASS_CB(cb->element_class);
+                if(!IS_PRIMITIVE(elem_cb) || cb->dim > 1)
+                    signalException(java_lang_IllegalArgumentException, NULL);
+                else {
+                    int src_idx = getPrimTypeIndex(elem_cb);
+                    int size = primTypeIndex2Size(src_idx);
+                    int dst_idx = typeNo2PrimTypeIndex(wCode);
+                    void *addr = &ARRAY_DATA((Object*)arr, char)[index * size];
+
+                    widenPrimitiveElement(src_idx, dst_idx, addr, &jv);
+                }
+            }
+        }
+    }
     return jv;
 }
 
@@ -1924,15 +1984,101 @@ void JVM_SetArrayElement(JNIEnv *env, jobject arr, jint index, jobject val) {
     TRACE("JVM_SetArrayElement(env=%p, arr=%p, index=%d, val=%p)", env, arr,
           index, val);
 
-    ARRAY_DATA((Object*)arr, Object*)[index] = val;
+    if(arr == NULL)
+        signalException(java_lang_NullPointerException, NULL);
+    else {
+        ClassBlock *cb = CLASS_CB(((Object*)arr)->class);
+
+        if(!IS_ARRAY(cb))
+            goto illegal_arg;
+
+        if(index > ARRAY_LEN((Object *)arr))
+            signalException(java_lang_ArrayIndexOutOfBoundsException, NULL);
+        else {
+            ClassBlock *elem_cb = CLASS_CB(cb->element_class);
+
+            if(!IS_PRIMITIVE(elem_cb) || cb->dim > 1) {
+                if(val != NULL && !arrayStoreCheck(((Object*)arr)->class,
+                                                   ((Object*)val)->class))
+                    goto illegal_arg;
+
+                ARRAY_DATA((Object*)arr, Object*)[index] = val;
+            } else {
+                int src_idx = getWrapperPrimTypeIndex(val);
+
+                if(src_idx == PRIM_IDX_VOID)
+                    goto illegal_arg;
+                else {
+                    int dst_idx = getPrimTypeIndex(elem_cb);
+                    void *src_addr = INST_BASE((Object*)val, void);
+                    int size = primTypeIndex2Size(dst_idx);
+                    void *dst_addr = &ARRAY_DATA((Object*)arr, char)
+                                                [index * size];
+
+                    if(dst_idx < PRIM_IDX_INT) {
+                        u4 value = *(u4*)src_addr;
+
+                        if(src_idx != dst_idx) {
+                            if(src_idx != PRIM_IDX_BYTE ||
+                               dst_idx != PRIM_IDX_SHORT)
+                                goto illegal_arg;
+                            *(signed short*)dst_addr = (signed char)value;
+                        } else {
+                            if(src_idx < PRIM_IDX_CHAR)
+                                *(char*)dst_addr = (char)value;
+                            else
+                                *(short*)dst_addr = (short)value;
+                        }
+                    } else
+                        if(!widenPrimitiveValue(src_idx, dst_idx, src_addr,
+                                                dst_addr, REF_SRC_FIELD |
+                                                          REF_DST_FIELD))
+                            goto illegal_arg;
+                }
+            }
+        }
+    }
+
+    return;
+
+illegal_arg:
+    signalException(java_lang_IllegalArgumentException, NULL);
 }
 
 
 /* JVM_SetPrimitiveArrayElement */
 
 void JVM_SetPrimitiveArrayElement(JNIEnv *env, jobject arr, jint index,
-                                  jvalue v, unsigned char vCode) {
-    UNIMPLEMENTED("JVM_SetPrimitiveArrayElement");
+                                  jvalue val, unsigned char vCode) {
+
+    TRACE("JVM_SetPrimitiveArrayElement(env=%p, arr=%p, index=%d, val=%lld,"
+    	  "vCode=%d)", env, arr, index, val.j, vCode);
+
+    if(arr == NULL)
+        signalException(java_lang_NullPointerException, NULL);
+    else {
+        ClassBlock *cb = CLASS_CB(((Object*)arr)->class);
+
+        if(!IS_ARRAY(cb))
+            signalException(java_lang_IllegalArgumentException, NULL);
+        else {
+            if(index > ARRAY_LEN((Object *)arr))
+                signalException(java_lang_ArrayIndexOutOfBoundsException, NULL);
+            else {
+                ClassBlock *elem_cb = CLASS_CB(cb->element_class);
+                if(!IS_PRIMITIVE(elem_cb) || cb->dim > 1)
+                    signalException(java_lang_IllegalArgumentException, NULL);
+                else {
+                    int dst_idx = getPrimTypeIndex(elem_cb);
+                    int size = primTypeIndex2Size(dst_idx);
+                    int src_idx = typeNo2PrimTypeIndex(vCode);
+                    void *addr = &ARRAY_DATA((Object*)arr, char)[index * size];
+
+                    widenPrimitiveElement(src_idx, dst_idx, &val, addr);
+                }
+            }
+        }
+    }
 }
 
 
@@ -1954,8 +2100,8 @@ jobject JVM_NewArray(JNIEnv *env, jclass eltClass, jint length) {
         ClassBlock *cb = CLASS_CB((Class*)eltClass);
 
         if(IS_PRIMITIVE(cb)) {
-            static int type_map[] = {T_BOOLEAN, T_BYTE, T_CHAR, T_SHORT,
-                                     T_INT, T_FLOAT, T_LONG, T_DOUBLE};
+            static char type_map[] = {T_BOOLEAN, T_BYTE, T_CHAR, T_SHORT,
+                                      T_INT, T_FLOAT, T_LONG, T_DOUBLE};
             int type = getPrimTypeIndex(cb);
         
             if(type == PRIM_IDX_VOID) {
@@ -2056,6 +2202,7 @@ jint JVM_InitializeSocketLibrary() {
     TRACE("JVM_InitializeSocketLibrary()");
 
     /* Nothing to be done */
+    return JNI_TRUE;
 }
 
 
@@ -2084,6 +2231,7 @@ jint JVM_SocketShutdown(jint fd, jint howto) {
     TRACE("JVM_SocketShutdown(fd=%d, howto=%d)", fd, howto);
 
     /* Nothing to be done */
+    return JNI_TRUE;
 }
 
 
@@ -2858,10 +3006,10 @@ typedef struct signal {
 } Signal;
 
 static Signal signals[] = {
-    "HUP",  SIGHUP,
-    "INT",  SIGINT,
-    "TERM", SIGTERM,
-    NULL,   -1
+    {"HUP",  SIGHUP},
+    {"INT",  SIGINT},
+    {"TERM", SIGTERM},
+    {NULL,   -1}
 };
 
 jint JVM_FindSignal(const char *name) {

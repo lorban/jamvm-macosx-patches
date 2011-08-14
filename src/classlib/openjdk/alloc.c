@@ -19,21 +19,21 @@
  */
 
 #include "jam.h"
-#include "symbol.h"
+#include "thread.h"
+#include "openjdk.h"
 
-void classlibVMShutdown() {
-    /* Execute Shutdown.shutdown() to run any registered shutdown hooks.
-       Unlike System.exit() it does not exit the VM after shutdown */
+#ifdef TRACEGC
+#define TRACE(fmt, ...) jam_printf(fmt, ## __VA_ARGS__)
+#else
+#define TRACE(fmt, ...)
+#endif
 
-    if(!VMInitialising()) {
-        Class *class = findSystemClass(SYMBOL(java_lang_Shutdown));
-        if(class != NULL) {
-            MethodBlock *mb = findMethod(class, SYMBOL(shutdown),
-                                                SYMBOL(___V));
-            if(mb != NULL)
-                executeStaticMethod(class, mb);
-        }
-
-        shutdownVM();
+void classlibHandleUnmarkedSpecial(Object *ob) {
+    if(IS_JTHREAD(CLASS_CB(ob->class))) {
+        /* Free the native thread structure (see comment
+           in detachThread (thread.c) */
+        TRACE("FREE: Freeing native thread for java thread object %p\n", ob);
+        gcPendingFree(jThread2Thread(ob));
     }
 }
+

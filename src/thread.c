@@ -356,7 +356,7 @@ long long javaThreadId(Thread *thread) {
 }
 
 Thread *jThread2Thread(Object *jThread) {
-    return classLibJThread2Thread(jThread);
+    return classlibJThread2Thread(jThread);
 }
 
 Thread *threadSelf() {
@@ -396,6 +396,7 @@ char *getThreadStateString(Thread *thread) {
         case TERMINATED:
             return "TERMINATED";
     }
+    return "INVALID";
 }
 
 int getThreadsCount() {
@@ -459,7 +460,7 @@ Object *initJavaThread(Thread *thread, char is_daemon, char *name,
     if(name != NULL && (thread_name = Cstr2String(name)) == NULL)
         return NULL;
 
-    if(!classLibInitJavaThread(thread, jlthread, thread_name, group,
+    if(!classlibInitJavaThread(thread, jlthread, thread_name, group,
                                is_daemon, NORM_PRIORITY))
         return NULL;
 
@@ -576,7 +577,7 @@ void uncaughtException() {
     Object *excep = exceptionOccurred();
     Object *group = INST_DATA(jThread, Object*, group_offset);
     FieldBlock *fb = findField(thread_class,
-                        classLibExceptionHandlerName(),
+                        classlibExceptionHandlerName(),
                         SYMBOL(sig_java_lang_Thread_UncaughtExceptionHandler));
     Object *thread_handler = fb == NULL ? NULL :
                                   INST_DATA(jThread, Object*, fb->u.offset);
@@ -618,15 +619,21 @@ void detachThread(Thread *thread) {
     executeMethod(group, (CLASS_CB(group->class))->
                                      method_table[rmveThrd_mtbl_idx], jThread);
 
-    classLibMarkThreadTerminated(jThread);
-
     /* Remove thread from the ID map hash table */
     deleteThreadFromHash(thread);
 
-    /* notify any threads waiting on the thread object -
-       these are joining this thread */
     objectLock(jThread);
+
+    /* Mark the thread as terminated.  This state is used in
+       determining if the thread is alive and so must be
+       done before notifying joining threads */
+    classlibSetThreadState(thread, TERMINATED);
+    classlibMarkThreadTerminated(jThread);
+
+    /* Notify any threads waiting on the thread object -
+        these are joining this thread */
     objectNotifyAll(jThread);
+
     objectUnlock(jThread);
 
     /* Thread's about to die, so no need to save registers for
@@ -636,8 +643,6 @@ void detachThread(Thread *thread) {
     /* Grab global lock, and update thread structures protected by
        it (thread list, thread ID and number of daemon threads) */
     pthread_mutex_lock(&lock);
-
-    classlibSetThreadState(thread, TERMINATED);
 
     /* remove from thread list... */
     if((thread->prev->next = thread->next))
@@ -658,9 +663,9 @@ void detachThread(Thread *thread) {
     /* It is safe to free the thread's ExecEnv and stack now as these are
        only used within the thread.  It is _not_ safe to free the native
        thread structure as another thread may be concurrently accessing it.
-       However, they must have a reference to the VMThread -- therefore, it
-       is safe to free during GC when the VMThread is determined to be no
-       longer reachable. */
+       However, they must have a reference to the java level thread --
+       therefore, it is safe to free during GC when the thread is determined
+       to be no longer reachable. */
     sysFree(ee->stack);
     sysFree(ee);
 
@@ -722,7 +727,7 @@ void createJavaThread(Object *jThread, long long stack_size) {
     ee->thread = jThread;
     ee->stack_size = stack_size;
 
-    if(!classLibCreateJavaThread(thread, jThread)) {
+    if(!classlibCreateJavaThread(thread, jThread)) {
         sysFree(thread);
         sysFree(ee);
         return;
@@ -731,7 +736,7 @@ void createJavaThread(Object *jThread, long long stack_size) {
     disableSuspend(self);
 
     if(pthread_create(&thread->tid, &attributes, threadStart, thread)) {
-        classLibMarkThreadTerminated(jThread);
+        classlibMarkThreadTerminated(jThread);
         sysFree(ee);
         enableSuspend(self);
         signalException(java_lang_OutOfMemoryError, "can't create thread");
@@ -854,7 +859,7 @@ Object *runningThreadStackTrace(Thread *thread, int max_depth,
     return convertTrace2Elements(trace, depth * 2);
 }
 
-int suspendThread(Thread *thread) {
+void suspendThread(Thread *thread) {
     thread->suspend = TRUE;
     MBARRIER();
 
@@ -1057,7 +1062,6 @@ void printThreadsDump(Thread *self) {
     char buffer[256];
     Thread *thread;
 
-    printf("PTD\n");fflush(stdout);
     suspendAllThreads(self);
     jam_printf("\n------ JamVM version %s Full Thread Dump -------\n",
                VERSION);
@@ -1248,7 +1252,7 @@ void mainThreadSetContextClassLoader(Object *loader) {
         INST_DATA(main_ee.thread, Object*, fb->u.offset) = loader;
 }
 
-void initialiseThreadStage1(InitArgs *args) {
+int initialiseThreadStage1(InitArgs *args) {
     size_t size;
 
     /* Set the default size of the Java stack for each _new_ thread */
@@ -1295,9 +1299,11 @@ void initialiseThreadStage1(InitArgs *args) {
     main_thread.park_state = PARK_RUNNING;
     pthread_cond_init(&main_thread.park_cv, NULL);
     pthread_mutex_init(&main_thread.park_lock, NULL);
+
+    return TRUE;
 }
 
-void initialiseThreadStage2(InitArgs *args) {
+int initialiseThreadStage2(InitArgs *args) {
     Class *thrdGrp_class;
     Object *main_group, *java_thread;
     FieldBlock *priority, *threadId;
@@ -1310,12 +1316,12 @@ void initialiseThreadStage2(InitArgs *args) {
 
     registerStaticClassRef(&thread_class);
 
-    name = findField(thread_class, SYMBOL(name), classLibThreadNameType());
+    name = findField(thread_class, SYMBOL(name), classlibThreadNameType());
     daemon = findField(thread_class, SYMBOL(daemon), SYMBOL(Z));
     group = findField(thread_class, SYMBOL(group),
                                     SYMBOL(sig_java_lang_ThreadGroup));
     priority = findField(thread_class, SYMBOL(priority), SYMBOL(I));
-    threadId = findField(thread_class, classLibThreadIdName(), SYMBOL(J));
+    threadId = findField(thread_class, classlibThreadIdName(), SYMBOL(J));
 
     run = findMethod(thread_class, SYMBOL(run), SYMBOL(___V));
 
@@ -1337,10 +1343,10 @@ void initialiseThreadStage2(InitArgs *args) {
     if(exceptionOccurred())
         goto error;
 
-    addThread_mb = findMethod(thrdGrp_class, classLibAddThreadName(),
+    addThread_mb = findMethod(thrdGrp_class, classlibAddThreadName(),
                                              SYMBOL(_java_lang_Thread__V));
 
-    remove_thread = findMethod(thrdGrp_class, classLibRemoveThreadName(),
+    remove_thread = findMethod(thrdGrp_class, classlibRemoveThreadName(),
                                               SYMBOL(_java_lang_Thread__V));
 
     /* findField and findMethod do not throw an exception... */
@@ -1351,7 +1357,7 @@ void initialiseThreadStage2(InitArgs *args) {
 
     /* Classlib specific initialisation prior to main thread being
        setup */
-    main_group = classLibThreadPreInit(thread_class, thrdGrp_class);
+    main_group = classlibThreadPreInit(thread_class, thrdGrp_class);
     if(main_group == NULL)
         goto error;
 
@@ -1369,7 +1375,7 @@ void initialiseThreadStage2(InitArgs *args) {
 
     /* Classlib specific initialisation once main thread has been
        setup */
-    if(!classLibThreadPostInit())
+    if(!classlibThreadPostInit())
         goto error;
 
     /* Create the signal handler thread.  It is responsible for
@@ -1379,11 +1385,11 @@ void initialiseThreadStage2(InitArgs *args) {
        shutdown hooks in the event of user-termination */
     createVMThread("Signal Handler", classlibSignalThread);
 
-    return;
+    return TRUE;
 
 error:
-    jam_fprintf(stderr, "Error initialising VM (initialiseMainThread)\n"
-                        "Check the README for compatible versions of GNU Classpath or OpenJDK\n");
+    jam_fprintf(stderr, "Error initialising VM (initialiseMainThread)\nCheck "
+                        "the README for compatible class-libraries/versions\n");
     printException();
-    exitVM(1);
+    return FALSE;
 }

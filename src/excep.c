@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
+ * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
  * Robert Lougher <rob@jamvm.org.uk>.
  *
  * This file is part of JamVM.
@@ -40,7 +40,7 @@ static int exception_symbols[] = {
     EXCEPTIONS_DO(SYMBOL_NAME_ENUM)
 };
 
-void initialiseException() {
+int initialiseException() {
     int i;
 
     ste_array_class = findArrayClass(SYMBOL(array_java_lang_StackTraceElement));
@@ -51,10 +51,8 @@ void initialiseException() {
         ste_init_mb = findMethod(ste_class, SYMBOL(object_init),
            SYMBOL(_java_lang_String_java_lang_String_java_lang_String_I__V));
 
-    if(ste_init_mb == NULL) {
-        jam_fprintf(stderr, "Error initialising VM (initialiseException)\n");
-        exitVM(1);
-    }
+    if(ste_init_mb == NULL)
+        goto error;
 
     registerStaticClassRef(&ste_array_class);
     registerStaticClassRef(&throw_class);
@@ -69,9 +67,12 @@ void initialiseException() {
         registerStaticClassRef(&exceptions[i]);
     }
 
-    classlibInitialiseException(throw_class);
+    if((inited = classlibInitialiseException(throw_class)))
+        return TRUE;
 
-    inited = TRUE;
+error:
+    jam_fprintf(stderr, "Error initialising VM (initialiseException)\n");
+    return FALSE;
 }
 
 Object *exceptionOccurred() {

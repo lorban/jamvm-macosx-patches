@@ -21,26 +21,26 @@
 
 /* Thread */
 
-extern char classLibInitJavaThread(Thread *thread, Object *jlthread,
+extern char classlibInitJavaThread(Thread *thread, Object *jlthread,
                                    Object *name, Object *group,
                                    char is_daemon, int priority);
 
-extern Object *classLibThreadPreInit(Class *thread_class,
+extern Object *classlibThreadPreInit(Class *thread_class,
                                      Class *thrdGrp_class);
 
-extern char classLibCreateJavaThread(Thread *thread, Object *jThread);
-extern void classLibMarkThreadTerminated(Object *jThread);
+extern char classlibCreateJavaThread(Thread *thread, Object *jThread);
+extern void classlibMarkThreadTerminated(Object *jThread);
 
-extern Thread *classLibJThread2Thread(Object *jThread);
+extern Thread *classlibJThread2Thread(Object *jThread);
 
-#define classLibThreadPostInit() \
+#define classlibThreadPostInit() \
     /* NOTHING TO DO */ TRUE
 
-#define classLibThreadIdName() SYMBOL(threadId)
-#define classLibAddThreadName() SYMBOL(addThread)
-#define classLibRemoveThreadName() SYMBOL(removeThread)
-#define classLibThreadNameType() SYMBOL(sig_java_lang_String)
-#define classLibExceptionHandlerName() SYMBOL(exceptionHandler)
+#define classlibThreadIdName() SYMBOL(threadId)
+#define classlibAddThreadName() SYMBOL(addThread)
+#define classlibRemoveThreadName() SYMBOL(removeThread)
+#define classlibThreadNameType() SYMBOL(sig_java_lang_String)
+#define classlibExceptionHandlerName() SYMBOL(exceptionHandler)
 
 #define classlibGetThreadState(thread) \
     (thread)->state
@@ -56,9 +56,10 @@ extern void classlibThreadName2Buff(Object *jThread, char *buffer,
 
 extern void classlibSignalThread(Thread *self);
 
+
 /* Class */
 
-extern void classlibInitialiseClass();
+extern int classlibInitialiseClass();
 extern void classlibCacheClassLoaderFields(Class *loader_class);
 extern HashTable *classlibLoaderTable(Object *class_loader);
 extern HashTable *classlibCreateLoaderTable(Object *class_loader);
@@ -85,7 +86,9 @@ extern FieldBlock *classlibFbFromReflectObject(Object *reflect_ob);
 
 /* DLL */
 
-extern int classlibInitialiseDll();
+#define classlibInitialiseDll() \
+    /* NOTHING TO DO */ TRUE
+
 extern char *classlibDefaultBootDllPath();
 extern void *classlibLookupLoadedDlls(char *name, Object *loader);
 
@@ -115,7 +118,7 @@ extern int classlibInitialiseNatives();
 
 /* Excep */
 
-extern void classlibInitialiseException(Class *throw_class);
+extern int classlibInitialiseException(Class *throw_class);
 
 /* Frame */
 

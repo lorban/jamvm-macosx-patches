@@ -1337,7 +1337,7 @@ Class *loadSystemClass(char *classname) {
                                  filename), &file_len);
 
     if(data == NULL) {
-        signalException(java_lang_ClassNotFoundException, classname);
+        signalException(java_lang_NoClassDefFoundError, classname);
         return NULL;
     }
 
@@ -1716,8 +1716,16 @@ void freeClassData(Class *class) {
             gcPendingFree(mb->code);
 #endif
 
-        gcPendingFree(mb->exception_table);
-        gcPendingFree(mb->line_no_table);
+        /* Miranda methods are a shallow copy of an interface
+           method.  Apart from code, all values are shared, and
+           we must not free them. */
+        if(mb->access_flags & ACC_MIRANDA)
+            continue;
+
+        if(!(mb->access_flags & ACC_NATIVE)) {
+            gcPendingFree(mb->exception_table);
+            gcPendingFree(mb->line_no_table);
+        }
         gcPendingFree(mb->throw_table);
 
         if(mb->annotations != NULL) {
@@ -1745,7 +1753,7 @@ void freeClassData(Class *class) {
         gcPendingFree(cb->annotations);
     }
 
-   if(cb->state >= CLASS_LINKED) {
+    if(cb->state >= CLASS_LINKED) {
         ClassBlock *super_cb = CLASS_CB(cb->super);
 
         /* interfaces do not have a method table, or 
@@ -1972,12 +1980,12 @@ out:
     return res;
 }
 
-void initialiseClass(InitArgs *args) {
+int initialiseClass(InitArgs *args) {
     char *bcp = setBootClassPath(args->bootpath, args->bootpathopt);
 
     if(!(bcp && parseBootClassPath(bcp))) {
         jam_fprintf(stderr, "bootclasspath is empty!\n");
-        exitVM(1);
+        return FALSE;
     }
 
     verbose = args->verboseclass;
@@ -1993,6 +2001,11 @@ void initialiseClass(InitArgs *args) {
     registerStaticClassRef(&java_lang_Class);
 
     /* Do classlib specific class initialisation */
-    classlibInitialiseClass();
+    if(!classlibInitialiseClass()) {
+        jam_fprintf(stderr, "Error initialising VM (initialiseClass)\n");
+        return FALSE;
+    }
+
+    return TRUE;
 }
 

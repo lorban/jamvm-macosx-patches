@@ -18,7 +18,9 @@
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#define CLASSLIB_CLASS_SPECIAL   0
+#define JTHREAD                 512
+#define CLASSLIB_CLASS_SPECIAL  JTHREAD
+
 #define CLASSLIB_CLASS_PAD_SIZE 19
 
 #define CLASSLIB_CLASS_EXTRA_FIELDS  \

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009
+ * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2011
  * Robert Lougher <rob@jamvm.org.uk>.
  *
  * This file is part of JamVM.
@@ -101,6 +101,7 @@ struct thread {
 extern Thread *threadSelf();
 extern long long javaThreadId(Thread *thread);
 extern Thread *jThread2Thread(Object *jThread);
+extern long long jThread2ThreadId(Object *jthread);
 
 extern void *getStackTop(Thread *thread);
 extern void *getStackBase(Thread *thread);
@@ -138,11 +139,12 @@ extern char *getThreadStateString(Thread *thread);
 
 extern Thread *findThreadById(long long id);
 extern Thread *findRunningThreadByTid(int tid);
-extern int suspendThread(Thread *thread);
+extern void suspendThread(Thread *thread);
 extern void resumeThread(Thread *thread);
 extern Object *runningThreadStackTrace(Thread *thread, int max_depth,
                                        int *in_native);
 extern Object *runningThreadObjects();
+extern void printThreadsDump(Thread *self);
 
 #define disableSuspend(thread)             \
 {                                          \

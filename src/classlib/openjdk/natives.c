@@ -183,8 +183,8 @@ uintptr_t *getObject(Class *class, MethodBlock *mb, uintptr_t *ostack) {
 }
 
 uintptr_t *getInt(Class *class, MethodBlock *mb, uintptr_t *ostack) {
-    int64_t   offset = *(int64_t  *)&ostack[2];
-    uint32_t  *pntr  =  (uint32_t *)((char *)ostack[1] + offset);
+    int64_t  offset = *(int64_t  *)&ostack[2];
+    uint32_t *pntr  =  (uint32_t *)((char *)ostack[1] + offset);
 
     *ostack++ = *pntr;
     return ostack;
@@ -210,16 +210,86 @@ uintptr_t *allocateMemory(Class *class, MethodBlock *mb, uintptr_t *ostack) {
 }
 
 uintptr_t *freeMemory(Class *class, MethodBlock *mb, uintptr_t *ostack) {
+    int64_t address = *(int64_t *)&ostack[1];
+
+    free((void *)(uintptr_t)address);
     return ostack;
 }
 
-uintptr_t *setMemory(Class *class, MethodBlock *mb, uintptr_t *ostack) {
+uintptr_t *setMemoryOpenJDK6(Class *class, MethodBlock *mb,
+                             uintptr_t *ostack) {
+
     int64_t address = *(int64_t *)&ostack[1];
-    int64_t size    = *(int64_t *)&ostack[3];
-    int32_t value   = *(int32_t *)&ostack[5];
-    void    *pntr   =  (void    *)(uintptr_t)address;
+    int64_t bytes   = *(int64_t *)&ostack[3];
+    int32_t value   = ostack[5];
+    void    *pntr   = (void *)(uintptr_t)address;
+    size_t  size    = bytes;
+
+    if(bytes < 0 || bytes != size) {
+        signalException(java_lang_IllegalArgumentException, NULL);
+        return ostack;
+    }
 
     memset(pntr, value, size);
+    return ostack;
+}
+
+uintptr_t *copyMemoryOpenJDK6(Class *class, MethodBlock *mb,
+                              uintptr_t *ostack) {
+
+    int64_t src_addr  = *(int64_t *)&ostack[1];
+    int64_t dst_addr  = *(int64_t *)&ostack[3];
+    int64_t bytes     = *(int64_t *)&ostack[5];
+    void    *src_pntr = (void *)(uintptr_t)src_addr;
+    void    *dst_pntr = (void *)(uintptr_t)dst_addr;
+    size_t  size      = bytes;
+
+    if(bytes < 0 || bytes != size) {
+        signalException(java_lang_IllegalArgumentException, NULL);
+        return ostack;
+    }
+
+    memcpy(dst_pntr, src_pntr, size);
+    return ostack;
+}
+
+uintptr_t *setMemoryOpenJDK7(Class *class, MethodBlock *mb,
+                             uintptr_t *ostack) {
+
+    Object *base    = (Object *)ostack[1];
+    int64_t offset  = *(int64_t *)&ostack[2];
+    int64_t bytes   = *(int64_t *)&ostack[4];
+    int32_t value   = ostack[6];
+    void   *pntr    = (char *)base + offset;
+    size_t  size    = bytes;
+
+    if(bytes < 0 || bytes != size) {
+        signalException(java_lang_IllegalArgumentException, NULL);
+        return ostack;
+    }
+
+    memset(pntr, value, size);
+    return ostack;
+}
+
+uintptr_t *copyMemoryOpenJDK7(Class *class, MethodBlock *mb,
+                              uintptr_t *ostack) {
+
+    Object *src_base  = (Object *)ostack[1];
+    int64_t src_ofst  = *(int64_t *)&ostack[2];
+    Object *dst_base  = (Object *)ostack[4];
+    int64_t dst_ofst  = *(int64_t *)&ostack[5];
+    int64_t bytes     = *(int64_t *)&ostack[7];
+    void   *src_pntr  = (char *)src_base + src_ofst;
+    void   *dst_pntr  = (char *)dst_base + dst_ofst;
+    size_t  size      = bytes;
+
+    if(bytes < 0 || bytes != size) {
+        signalException(java_lang_IllegalArgumentException, NULL);
+        return ostack;
+    }
+
+    memcpy(dst_pntr, src_pntr, size);
     return ostack;
 }
 
@@ -268,7 +338,8 @@ uintptr_t *throwException(Class *class, MethodBlock *mb, uintptr_t *ostack) {
 }
 
 uintptr_t *allocateInstance(Class *class, MethodBlock *mb, uintptr_t *ostack) {
-    *ostack++ = (uintptr_t) allocObjectClassCheck((Class *)ostack[1]);
+    Object *obj = allocObjectClassCheck((Class *)ostack[1]);
+    *ostack++ = (uintptr_t)obj;
     return ostack;
 }
 
@@ -350,13 +421,17 @@ VMMethod sun_misc_unsafe[] = {
     {"getDouble",              "(Ljava/lang/Object;J)D", getLong},
     {"getObject",              "(Ljava/lang/Object;J)Ljava/lang/Object;",
                                getObject},
+    {"setMemory",              "(JJB)V", setMemoryOpenJDK6},
+    {"copyMemory",             "(JJJ)V", copyMemoryOpenJDK6},
+    {"setMemory",              "(Ljava/lang/Object;JJB)V", setMemoryOpenJDK7},
+    {"copyMemory",             "(Ljava/lang/Object;JLjava/lang/Object;JJ)V",
+                               copyMemoryOpenJDK7},
     {"arrayBaseOffset",        NULL, arrayBaseOffset},
     {"arrayIndexScale",        NULL, arrayIndexScale},
     {"unpark",                 NULL, unpark},
     {"park",                   NULL, park},
     {"allocateMemory",         NULL, allocateMemory},
     {"freeMemory",             NULL, freeMemory},
-    {"setMemory",              NULL, setMemory},
     {"ensureClassInitialized", NULL, ensureClassInitialized},
     {"defineClass",            "(Ljava/lang/String;[BII"
                                 "Ljava/lang/ClassLoader;"

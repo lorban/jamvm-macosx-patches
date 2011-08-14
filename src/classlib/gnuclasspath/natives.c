@@ -46,7 +46,8 @@ int classlibInitialiseNatives() {
                                SYMBOL(sig_java_security_ProtectionDomain));
 
     if(pd == NULL) {
-        jam_fprintf(stderr, "Error initialising VM (initialiseNatives)\n");
+        jam_fprintf(stderr, "Expected \"pd\" field missing in "
+                            "java.lang.Class\n");
         return FALSE;
     }
 
@@ -150,7 +151,10 @@ uintptr_t *runFinalization(Class *class, MethodBlock *mb, uintptr_t *ostack) {
 
 uintptr_t *exitInternal(Class *class, MethodBlock *mb, uintptr_t *ostack) {
     int status = ostack[0];
-    shutdownVM(status);
+
+    shutdownVM();
+    jamvm_exit(status);
+
     /* keep compiler happy */
     return ostack;
 }

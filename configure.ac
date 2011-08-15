@@ -34,6 +34,7 @@ i[[3456]]86-*-linux*) host_cpu=i386 host_os=linux ;;
 i[[3456]]86-*-kfreebsd*) host_cpu=i386 host_os=linux ;;
 i[[3456]]86-*-darwin*)
   host_os=darwin
+  LDFLAGS="$LDFLAGS -framework CoreServices"
   case "$CFLAGS" in
     *-m32*) host_cpu=i386 ;;
     *-m64*) host_cpu=x86_64 ;;

@@ -32,7 +32,7 @@ AC_CANONICAL_HOST
 case "$host" in
 i[[3456]]86-*-linux*) host_cpu=i386 host_os=linux ;;
 i[[3456]]86-*-kfreebsd*) host_cpu=i386 host_os=linux ;;
-i[[3456]]86-*-darwin*)
+*86*-darwin*)
   host_os=darwin
   LDFLAGS="$LDFLAGS -framework CoreServices"
   case "$CFLAGS" in
@@ -45,7 +45,7 @@ i[[3456]]86-*-darwin*)
       esac
     ;;
   esac
-  echo "$host: target CPU set to ${host_cpu}"
+  echo "$host: host CPU set to ${host_cpu}"
   if test "$host_cpu" = "x86_64"; then
     enable_ffi=yes
     CFLAGS="$CFLAGS -I/usr/include/ffi"
